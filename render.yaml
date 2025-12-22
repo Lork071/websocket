@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tipster-websocket
+    env: node
+    buildCommand: npm install
+    startCommand: npm run prod
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: WS_PORT
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+    # Free tier settings
+    plan: free
+    # Health check endpoint
+    healthCheckPath: /health
