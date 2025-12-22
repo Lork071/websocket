@@ -1,11 +1,27 @@
 const { Server } = require('socket.io');
 const config = require('./config');
+const http = require('http');
 
 // Get current environment configuration
 const envConfig = config.current;
 
-// WebSocket server
-const io = new Server(envConfig.port, {
+// Create HTTP server first
+const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'ok', 
+            timestamp: new Date().toISOString(),
+            environment: config.environment
+        }));
+    } else {
+        res.writeHead(404);
+        res.end('Not found');
+    }
+});
+
+// Attach Socket.IO to HTTP server
+const io = new Server(server, {
     cors: envConfig.cors
 });
 
@@ -191,27 +207,7 @@ io.on('connection', (socket) => {
     });
 });
 
-// Health check endpoint for Render.com
-const http = require('http');
-const server = http.createServer((req, res) => {
-    if (req.url === '/health') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ 
-            status: 'ok', 
-            timestamp: new Date().toISOString(),
-            environment: config.environment,
-            activeEvents: activeUsers.size,
-            totalUsers: Array.from(activeUsers.values()).reduce((sum, users) => sum + users.size, 0)
-        }));
-    } else {
-        res.writeHead(404);
-        res.end('Not found');
-    }
-});
-
-// Attach Socket.IO to HTTP server
-io.attach(server);
-
+// Start server
 server.listen(envConfig.port, () => {
     if (envConfig.logging.enabled) {
         console.log(`WebSocket server running on port ${envConfig.port}`);
