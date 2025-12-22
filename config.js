@@ -20,8 +20,8 @@ const config = {
     
     // Production configuration
     production: {
-        // Render.com uses PORT env variable, fallback to WS_PORT or 3000
-        port: process.env.PORT || process.env.WS_PORT || 3000,
+        // Render.com uses PORT env variable, fallback to 3000 (removed WS_PORT)
+        port: process.env.PORT || 3000,
         cors: {
             origin: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['https://tipzone.cz', 'https://www.tipzone.cz'],
             methods: ['GET', 'POST'],
