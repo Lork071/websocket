@@ -155,6 +155,55 @@ io.on('connection', (socket) => {
         }
     });
 
+    // ── ADMIN CHAT ROOMS ────────────────────────────────────────────────────────
+
+    // Join admin event room
+    socket.on('join-admin-event', (data) => {
+        const { eventId, userId, userName, userPicture } = data;
+        socket.join(`admin-event-${eventId}`);
+        socket.adminEventId = eventId;
+        if (envConfig.logging.verbose) {
+            console.log(`Admin ${userName} (${userId}) joined admin chat for event ${eventId}`);
+        }
+    });
+
+    // New admin message
+    socket.on('new-admin-message', (data) => {
+        socket.to(`admin-event-${data.eventId}`).emit('admin-message-received', data.message);
+    });
+
+    // Admin typing start
+    socket.on('admin-typing-start', (data) => {
+        socket.to(`admin-event-${data.eventId}`).emit('admin-user-typing', {
+            userId: data.userId,
+            userName: data.userName,
+            isTyping: true
+        });
+    });
+
+    // Admin typing stop
+    socket.on('admin-typing-stop', (data) => {
+        socket.to(`admin-event-${data.eventId}`).emit('admin-user-typing', {
+            userId: data.userId,
+            isTyping: false
+        });
+    });
+
+    // Admin message deleted
+    socket.on('admin-message-deleted', (data) => {
+        io.to(`admin-event-${data.eventId}`).emit('admin-message-deleted', { messageId: data.messageId });
+    });
+
+    // Admin reaction toggled
+    socket.on('admin-reaction-toggled', (data) => {
+        socket.to(`admin-event-${data.eventId}`).emit('admin-reaction-updated', {
+            messageId: data.messageId,
+            reactions: data.reactions
+        });
+    });
+
+    // ── DISCONNECT ───────────────────────────────────────────────────────────────
+
     // Disconnect
     socket.on('disconnect', () => {
         if (envConfig.logging.verbose) {
