@@ -30,6 +30,7 @@ console.log('CORS origins:', envConfig.cors.origin);
 
 // Store active users per event
 const activeUsers = new Map(); // eventId -> Map of userId -> {socketIds: Set, userName, userPicture}
+const activeAdminUsers = new Map(); // eventId -> Map of userId -> {socketIds: Set, userName, userPicture}
 const typingUsers = new Map(); // eventId -> Map of userId -> userName
 
 io.on('connection', (socket) => {
@@ -162,6 +163,32 @@ io.on('connection', (socket) => {
         const { eventId, userId, userName, userPicture } = data;
         socket.join(`admin-event-${eventId}`);
         socket.adminEventId = eventId;
+        socket.adminUserId = userId;
+        socket.adminUserName = userName;
+        socket.adminUserPicture = userPicture;
+
+        // Track active admin users
+        if (!activeAdminUsers.has(eventId)) {
+            activeAdminUsers.set(eventId, new Map());
+        }
+        const adminEventUsers = activeAdminUsers.get(eventId);
+        if (!adminEventUsers.has(userId)) {
+            adminEventUsers.set(userId, {
+                socketIds: new Set(),
+                userName: userName,
+                userPicture: userPicture
+            });
+        }
+        adminEventUsers.get(userId).socketIds.add(socket.id);
+
+        const adminUsersList = Array.from(adminEventUsers.entries()).map(([uid, user]) => ({
+            userId: uid,
+            userName: user.userName,
+            userPicture: user.userPicture
+        }));
+        io.to(`admin-event-${eventId}`).emit('admin-active-users-count', adminEventUsers.size);
+        io.to(`admin-event-${eventId}`).emit('admin-active-users-list', adminUsersList);
+
         if (envConfig.logging.verbose) {
             console.log(`Admin ${userName} (${userId}) joined admin chat for event ${eventId}`);
         }
@@ -251,6 +278,36 @@ io.on('connection', (socket) => {
                     userId, 
                     isTyping: false 
                 });
+            }
+        }
+
+        // Remove from active admin users
+        if (socket.adminEventId) {
+            const eventId = socket.adminEventId;
+            const userId = socket.adminUserId;
+
+            if (activeAdminUsers.has(eventId)) {
+                const adminEventUsers = activeAdminUsers.get(eventId);
+
+                if (adminEventUsers.has(userId)) {
+                    const user = adminEventUsers.get(userId);
+                    user.socketIds.delete(socket.id);
+                    if (user.socketIds.size === 0) {
+                        adminEventUsers.delete(userId);
+                    }
+                }
+
+                const adminUsersList = Array.from(adminEventUsers.entries()).map(([uid, user]) => ({
+                    userId: uid,
+                    userName: user.userName,
+                    userPicture: user.userPicture
+                }));
+                io.to(`admin-event-${eventId}`).emit('admin-active-users-count', adminEventUsers.size);
+                io.to(`admin-event-${eventId}`).emit('admin-active-users-list', adminUsersList);
+
+                if (adminEventUsers.size === 0) {
+                    activeAdminUsers.delete(eventId);
+                }
             }
         }
     });
